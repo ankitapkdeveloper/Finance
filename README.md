@@ -20,15 +20,17 @@ backed by Supabase.
 
 ## 1. Create a Supabase project
 1. Go to [supabase.com](https://supabase.com), sign up, and click **New project**.
-2. **Before anyone signs up:** go to **Authentication → Providers → Email**
-   and turn **off** "Confirm email". Family accounts use made-up email
-   addresses under the hood (see "How family logins work" below) that
-   can't receive real mail — if confirmation stays on, nobody will ever
-   be able to finish signing up.
-3. Open the **SQL Editor** (left sidebar), paste in the full contents of
-   `supabase-schema.sql`, and click **Run**.
+2. Open **SQL Editor**, paste the full contents of `supabase-schema.sql`, and click **Run**.
+3. Open **Edge Functions → Deploy a new function** and create `family-auth` using
+   `supabase/functions/family-auth/index.ts`. The included `supabase/config.toml`
+   sets this function to accept unauthenticated setup requests.
 4. Go to **Settings → API** and copy your **Project URL** and your
-   **anon public** key.
+   **publishable/anon public** key.
+
+> **Important:** You do **not** need to turn on or off email confirmation for this
+> new signup flow. Family creation uses the server-side Auth Admin API with an
+> auto-confirmed internal identifier, so the browser never calls Supabase's
+> public email-signup endpoint and no confirmation email is sent.
 
 ## 2. Connect the app to Supabase
 Open `config.js` and paste your values in:
@@ -84,13 +86,16 @@ aren't real email addresses, there's no "forgot password" email to
 fall back on — losing it means losing access to that family's data.
 
 ### How family logins work
-Each family is a real account (handled by Supabase's built-in login
-system), and the database enforces — not just the app's interface —
-that a family can only ever read or write its own data. The family
-name you type is turned into a fake email address behind the scenes
-(e.g. "Sharma House" becomes `sharma-house@familykharcha.local`) purely
-because the login system expects an email-shaped username; it's never
-actually emailed anywhere.
+Each family is a real Supabase Auth account, and the database enforces —
+not just the app's interface — that a family can only ever read or write
+its own data. The visible login remains **Family Name + Family Password**.
+For Supabase's internal password identity, the Edge Function creates an
+auto-confirmed internal identifier such as `sharma-house@familykharcha.app`;
+it is not a real mailbox and the app never asks the family to use it.
+New family creation happens server-side instead of through `auth.signUp()`,
+so the old public email-signup rate limit is no longer used for creating
+new families. Existing accounts from the older `.local` build can still
+log in.
 
 The daily PIN is a separate, lighter thing: it's stored only on that
 one device, and it just saves you from retyping the family password

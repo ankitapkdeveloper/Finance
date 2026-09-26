@@ -1,0 +1,2 @@
+[functions.family-auth]
+verify_jwt = false

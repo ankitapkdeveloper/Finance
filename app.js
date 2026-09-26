@@ -725,8 +725,21 @@ function exportCSV(){
   URL.revokeObjectURL(url);
 }
 
-function usernameToEmail(u){
-  return u.trim().toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9\-]/g,'') + '@familykharcha.app';
+// Internal auth identifier. Users never see or enter this value.
+// New families are created server-side by the `family-auth` Edge Function,
+// which prevents Supabase's public email-signup endpoint from being used.
+function familyAuthEmail(u, domain='familykharcha.app'){
+  const slug = u.trim().toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9\-]/g,'');
+  return slug + '@' + domain;
+}
+
+async function familyAuth(action, familyName, password){
+  const { data, error } = await sb.functions.invoke('family-auth', {
+    body: { action, familyName, password }
+  });
+  if(error) throw error;
+  if(!data || !data.email) throw new Error('Authentication service did not return a login identifier');
+  return data.email;
 }
 function showAuthScreen(mode){
   state.authMode = mode;
@@ -749,31 +762,58 @@ function initAuthForm(){
     const pass = document.getElementById('authPassword').value;
     const confirm = document.getElementById('authConfirm').value;
     const errEl = document.getElementById('authError');
+    const btn = document.getElementById('authSubmitBtn');
     errEl.textContent='';
     if(!uname || !pass){ errEl.textContent='Enter a family name and password'; return; }
+    if(uname.length < 2){ errEl.textContent='Family name should be at least 2 characters'; return; }
     if(pass.length<6){ errEl.textContent='Password should be at least 6 characters'; return; }
-    const email = usernameToEmail(uname);
-    if(state.authMode==='signup'){
-      if(pass!==confirm){ errEl.textContent="Passwords don't match"; return; }
-      const { data, error } = await sb.auth.signUp({ email, password: pass });
-      if(error){ errEl.textContent = error.message; return; }
-      if(data.user && data.user.identities && data.user.identities.length===0){
-        errEl.textContent = 'That family name is already taken — try logging in instead.'; return;
+    if(!navigator.onLine){ errEl.textContent='You are offline — connect to the internet to log in or create a family'; return; }
+
+    btn.disabled = true;
+    const oldText = btn.textContent;
+    btn.textContent = state.authMode==='signup' ? 'Creating…' : 'Logging in…';
+    try {
+      if(state.authMode==='signup'){
+        if(pass!==confirm){ errEl.textContent="Passwords don't match"; return; }
+        // The Edge Function creates the Supabase Auth user with an internal
+        // identifier and auto-confirms it. No email is sent.
+        const email = await familyAuth('create', uname, pass);
+        const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+        if(error) throw error;
+        currentUserId = data.session.user.id;
+        hideAuthScreen();
+        showPinScreen('set');
+      } else {
+        // New accounts use .app. The .local fallback keeps families created
+        // by older versions of Family Kharcha working.
+        let email = familyAuthEmail(uname, 'familykharcha.app');
+        let { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+        if(error){
+          const oldEmail = familyAuthEmail(uname, 'familykharcha.local');
+          if(oldEmail !== email){
+            const retry = await sb.auth.signInWithPassword({ email: oldEmail, password: pass });
+            data = retry.data; error = retry.error;
+          }
+        }
+        if(error){ errEl.textContent = 'Wrong family name or password'; return; }
+        currentUserId = data.session.user.id;
+        hideAuthScreen();
+        const pin = localStorage.getItem('kharcha_pin_'+currentUserId);
+        showPinScreen(pin ? 'enter' : 'set');
       }
-      if(!data.session){
-        errEl.textContent = "Couldn't sign in automatically — ask whoever set up this app to turn off \u201CConfirm email\u201D in the Supabase dashboard, then try again.";
-        return;
+    } catch(error) {
+      console.error('Family auth error:', error);
+      const msg = String(error?.message || '').toLowerCase();
+      if(msg.includes('already') || msg.includes('duplicate') || msg.includes('taken')) {
+        errEl.textContent = 'That family name is already taken — try logging in instead.';
+      } else if(msg.includes('rate limit') || msg.includes('too many')) {
+        errEl.textContent = 'Too many attempts. Please wait a few minutes and try again.';
+      } else {
+        errEl.textContent = 'Could not connect to the family login service. Please try again.';
       }
-      currentUserId = data.session.user.id;
-      hideAuthScreen();
-      showPinScreen('set');
-    } else {
-      const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
-      if(error){ errEl.textContent = 'Wrong family name or password'; return; }
-      currentUserId = data.session.user.id;
-      hideAuthScreen();
-      const pin = localStorage.getItem('kharcha_pin_'+currentUserId);
-      showPinScreen(pin ? 'enter' : 'set');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = oldText;
     }
   };
 }

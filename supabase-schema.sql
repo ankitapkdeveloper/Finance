@@ -1,12 +1,10 @@
 -- Family Kharcha — database setup
 -- Run this once in your Supabase project's SQL Editor (Dashboard -> SQL Editor -> New query -> Run).
 --
--- IMPORTANT (do this first): this version adds real login, so more than
--- one family can use the same deployment, each seeing only their own
--- data. Go to Authentication -> Providers -> Email in your Supabase
--- dashboard and turn OFF "Confirm email". Family accounts use made-up
--- email addresses that can't receive real mail, so if confirmation stays
--- on, nobody will ever be able to log in after signing up.
+-- IMPORTANT: this version adds real family login, so more than one family
+-- can use the same deployment, each seeing only their own data.
+-- New family creation is handled by the server-side `family-auth` Edge
+-- Function using the Auth Admin API with auto-confirmation. No email is sent.
 --
 -- Already ran an earlier version of this file and have tables from
 -- before? Skip down to the "UPGRADING" block at the very bottom instead
