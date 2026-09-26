@@ -6,6 +6,6 @@
 // controlled separately by the Row Level Security policies defined in
 // supabase-schema.sql, not by keeping this key secret.
 window.SUPABASE_CONFIG = {
-  url: 'https://YOUR-PROJECT-REF.supabase.co',
-  anonKey: 'YOUR-ANON-PUBLIC-KEY'
+  url: 'https://fgvmvmoatbirjsjbwiun.supabase.co',
+  anonKey: 'sb_publishable_wdP_h4qTN2c7cfb5i1cMeQ_Qz9xJaqT'
 };
