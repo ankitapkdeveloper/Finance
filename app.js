@@ -726,7 +726,7 @@ function exportCSV(){
 }
 
 function usernameToEmail(u){
-  return u.trim().toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9\-]/g,'') + '@familykharcha.local';
+  return u.trim().toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9\-]/g,'') + '@familykharcha.app';
 }
 function showAuthScreen(mode){
   state.authMode = mode;
